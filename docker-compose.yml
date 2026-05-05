@@ -1,0 +1,87 @@
+services:
+
+  database:
+    build: ./database
+    restart: unless-stopped
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    env_file:
+      - ./database/.env
+
+  experiment-tracking:
+    build: ./backend-experiment-tracking
+    ports:
+      - 5000:5000
+    depends_on:
+      - database
+
+  orchestration:
+    build: ./backend-orchestration
+    ports:
+      - 4200:4200
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  web-service:
+    build: ./deploy-web-api
+    depends_on:
+      orchestration:
+        condition: service_healthy
+    volumes:
+      - batch-data:/batch-data
+      
+  train-deploy:
+    build: ./train-and-deploy
+    depends_on:
+      orchestration:
+        condition: service_healthy
+      experiment-tracking:
+        condition: service_started
+
+  batch-service:
+    build: ./deploy-batch
+    depends_on:
+      orchestration:
+        condition: service_healthy
+    volumes:
+      - batch-data:/batch-data
+
+  grafana:
+    image: grafana/grafana
+    restart: unless-stopped
+    volumes:
+      - batch-data:/batch-data
+      - grafana-data-config-datasources:/etc/grafana/provisioning/datasources:ro
+      - grafana-data-config-dashboards:/etc/grafana/provisioning/dashboards:ro
+      - grafana-data-dashboards:/opt/grafana/dashboards
+    ports:
+      - "3400:3000"
+
+  monitoring:
+    build: ./evidently
+    depends_on:
+      orchestration:
+        condition: service_healthy
+      database:
+        condition: service_started
+    volumes:
+      - batch-data:/batch-data
+
+  best-practices-dev:
+    image: mcr.microsoft.com/devcontainers/python:1-3.12-bullseye
+    volumes:
+      - .:/workspace:cached
+    command: sleep infinity
+    # depends_on:
+    #   - train-deploy
+
+volumes:
+  postgres-data:
+  batch-data:
+  grafana-data-config-datasources:
+  grafana-data-config-dashboards:
+  grafana-data-dashboards:
