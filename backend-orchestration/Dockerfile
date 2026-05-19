@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-RUN pip install --no-cache-dir "prefect>=3.0"
+RUN pip install --no-cache-dir "prefect>=3.0" "asyncpg>=0.29"
 
 EXPOSE 4200
 

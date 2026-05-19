@@ -23,13 +23,19 @@ FEATURE_COLS = [
 ]
 
 # ---------------------------------------------------------------------------
-# Load models at startup
+# Lazy model loading (loaded on first request, not at import time)
 # ---------------------------------------------------------------------------
 mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
 
 _models: dict = {}
-for _name, _key in [(ZON_MODEL_NAME, "zon"), (WIND_MODEL_NAME, "wind")]:
-    _models[_key] = mlflow.pyfunc.load_model(f"models:/{_name}/latest")
+
+
+def get_models() -> dict:
+    """Load models from MLflow registry on first call, then cache them."""
+    if not _models:
+        for _name, _key in [(ZON_MODEL_NAME, "zon"), (WIND_MODEL_NAME, "wind")]:
+            _models[_key] = mlflow.pyfunc.load_model(f"models:/{_name}/latest")
+    return _models
 
 
 app = Flask(__name__)
@@ -42,6 +48,11 @@ def health():
 
 @app.post("/predict")
 def predict():
+    try:
+        models = get_models()
+    except Exception as exc:
+        return jsonify({"error": f"Models not available: {exc}"}), 503
+
     data = request.get_json(force=True)
     if not data or "forecasts" not in data:
         return jsonify({"error": "Missing 'forecasts' key"}), 400
@@ -67,8 +78,8 @@ def predict():
             return jsonify({"error": f"Invalid forecast entry: {exc}"}), 400
 
     X = pd.DataFrame(rows, columns=FEATURE_COLS)
-    zon_preds = _models["zon"].predict(X)
-    wind_preds = _models["wind"].predict(X)
+    zon_preds = models["zon"].predict(X)
+    wind_preds = models["wind"].predict(X)
 
     predictions = [
         {

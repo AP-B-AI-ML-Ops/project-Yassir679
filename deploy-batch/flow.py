@@ -8,6 +8,7 @@ import mlflow
 import mlflow.pyfunc
 import pandas as pd
 import requests
+from mlflow import MlflowClient
 from prefect import flow, get_run_logger, task
 from prefect.cache_policies import NO_CACHE
 from prefect.deployments import run_deployment
@@ -16,6 +17,9 @@ from sklearn.metrics import mean_squared_error
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://experiment-tracking:5000")
 ZON_MODEL_NAME = os.getenv("ZON_MODEL_NAME", "energy-zon-production")
 WIND_MODEL_NAME = os.getenv("WIND_MODEL_NAME", "energy-wind-production")
+
+mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+client = MlflowClient(MLFLOW_TRACKING_URI)
 
 PRODUCTIE_CSV = os.getenv("PRODUCTIE_CSV", "/data/productie_comnbined.csv")
 BATCH_DATA_DIR = os.getenv("BATCH_DATA_DIR", "/batch-data")
@@ -26,6 +30,28 @@ RMSE_THRESHOLD_WIND = float(os.getenv("RMSE_THRESHOLD_WIND", "300"))
 
 # Name of the Prefect deployment to trigger for retraining
 RETRAIN_DEPLOYMENT = os.getenv("RETRAIN_DEPLOYMENT", "training-pipeline/energy-training")
+
+# ---------------------------------------------------------------------------
+# MLflow helpers
+# ---------------------------------------------------------------------------
+
+def get_latest_version(model_name: str) -> str:
+    """Return the latest registered version number for a model via the MLflow REST API."""
+    response = requests.post(
+        f"{MLFLOW_TRACKING_URI}/api/2.0/mlflow/registered-models/get-latest-versions",
+        json={"name": model_name, "stages": ["None"]},
+        timeout=10,
+    )
+    response.raise_for_status()
+    versions = response.json().get("model_versions", [])
+    return versions[-1]["version"]
+
+
+def load_model(model_name: str):
+    """Load a registered MLflow model by fetching the latest version first."""
+    latest_version = get_latest_version(model_name)
+    return mlflow.pyfunc.load_model(f"models:/{model_name}/{latest_version}")
+
 
 # Open-Meteo / Antwerp settings
 LATITUDE = 51.2194
@@ -101,9 +127,8 @@ def run_inference(forecast_df: pd.DataFrame) -> pd.DataFrame:
     """Load the latest registered MLflow models and predict solar & wind production."""
     logger = get_run_logger()
 
-    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-    zon_model = mlflow.pyfunc.load_model(f"models:/{ZON_MODEL_NAME}/latest")
-    wind_model = mlflow.pyfunc.load_model(f"models:/{WIND_MODEL_NAME}/latest")
+    zon_model = load_model(ZON_MODEL_NAME)
+    wind_model = load_model(WIND_MODEL_NAME)
 
     X = forecast_df[FEATURE_COLS]
 
