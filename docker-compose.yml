@@ -57,10 +57,16 @@ services:
 
   batch-service:
     build: ./deploy-batch
+    environment:
+      PREFECT_API_URL: http://orchestration:4200/api
+      MLFLOW_TRACKING_URI: http://experiment-tracking:5000
     depends_on:
       orchestration:
         condition: service_healthy
+      experiment-tracking:
+        condition: service_started
     volumes:
+      - ./data:/data:ro
       - batch-data:/batch-data
 
   grafana:

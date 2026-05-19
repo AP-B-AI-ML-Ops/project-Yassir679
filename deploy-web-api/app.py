@@ -31,9 +31,7 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
+
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://experiment-tracking:5000")
 ZON_MODEL_NAME = os.getenv("ZON_MODEL_NAME", "energy-zon-production")
 WIND_MODEL_NAME = os.getenv("WIND_MODEL_NAME", "energy-wind-production")
