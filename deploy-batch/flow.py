@@ -1,17 +1,3 @@
-"""
-Batch Inference Pipeline
-
-Prefect flow that runs on a daily schedule (06:00 UTC):
-
-  1. fetch_weather_forecast   – Pull 7-day ECMWF forecast from Open-Meteo for Antwerp
-  2. run_inference             – Load registered MLflow models; predict zon_mwh & wind_mwh
-  3. save_predictions          – Append predictions to /batch-data/predictions.csv
-  4. load_actuals              – Read historical Elia/Vlaanderen production actuals
-  5. compute_metrics           – Join past predictions with actuals; compute RMSE per target
-  6. save_metrics              – Append RMSE row to /batch-data/metrics.csv
-  7. check_retraining_threshold– If RMSE > threshold, trigger the training-pipeline deployment
-"""
-
 from __future__ import annotations
 
 import os
@@ -27,9 +13,6 @@ from prefect.cache_policies import NO_CACHE
 from prefect.deployments import run_deployment
 from sklearn.metrics import mean_squared_error
 
-# ---------------------------------------------------------------------------
-# Configuration  (all overridable via environment variables)
-# ---------------------------------------------------------------------------
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://experiment-tracking:5000")
 ZON_MODEL_NAME = os.getenv("ZON_MODEL_NAME", "energy-zon-production")
 WIND_MODEL_NAME = os.getenv("WIND_MODEL_NAME", "energy-wind-production")
