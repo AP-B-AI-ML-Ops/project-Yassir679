@@ -28,9 +28,15 @@ services:
 
   web-service:
     build: ./deploy-web-api
+    ports:
+      - "8000:8000"
+    environment:
+      MLFLOW_TRACKING_URI: http://experiment-tracking:5000
     depends_on:
       orchestration:
         condition: service_healthy
+      experiment-tracking:
+        condition: service_started
     volumes:
       - batch-data:/batch-data
       
