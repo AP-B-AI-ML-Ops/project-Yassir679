@@ -89,7 +89,7 @@ def store_metrics(
     rows = [
         {
             "run_time": run_time,
-            "metric_name": metric["metric_id"],
+            "metric_name": metric["metric_name"],
             "value": str(metric["value"]),
         }
         for metric in json_data["metrics"]

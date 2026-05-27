@@ -94,7 +94,6 @@ def fetch_weather_forecast() -> pd.DataFrame:
         "wind_speed_unit": "kmh",
         "forecast_days": FORECAST_DAYS,
         "timezone": "Europe/Brussels",
-        "models": "ecmwf_ifs04",
     }
 
     resp = requests.get(
@@ -144,7 +143,10 @@ def run_inference(forecast_df: pd.DataFrame) -> pd.DataFrame:
     zon_model = load_model(ZON_MODEL_NAME)
     wind_model = load_model(WIND_MODEL_NAME)
 
-    X = forecast_df[FEATURE_COLS]
+    forecast_df = forecast_df.dropna(subset=FEATURE_COLS).reset_index(drop=True)
+    X = forecast_df[FEATURE_COLS].astype(
+        {"day_of_year": "int32", "month": "int32", "weekday": "int32"}
+    )
 
     predictions = forecast_df[["datum"]].copy()
     predictions["zon_mwh_predicted"] = zon_model.predict(X)

@@ -82,6 +82,7 @@ def predict():
             return jsonify({"error": f"Invalid forecast entry: {exc}"}), 400
 
     X = pd.DataFrame(rows, columns=FEATURE_COLS)
+    X = X.astype({"day_of_year": "int32", "month": "int32", "weekday": "int32"})
     zon_preds = models["zon"].predict(X)
     wind_preds = models["wind"].predict(X)
 
