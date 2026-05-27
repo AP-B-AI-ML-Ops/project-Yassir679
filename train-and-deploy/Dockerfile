@@ -1,11 +1,11 @@
-FROM python:3.11-slim
+FROM python:3.12-bullseye
 
-WORKDIR /app
+RUN pip install -U pip
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY . /
 
-COPY train.py .
-COPY flow.py .
+RUN pip install -r ./requirements.txt --upgrade
+
+RUN prefect config set PREFECT_API_URL=http://orchestration:4200/api
 
 CMD ["python", "flow.py"]

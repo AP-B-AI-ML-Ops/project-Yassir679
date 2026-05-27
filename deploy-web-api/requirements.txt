@@ -1,4 +1,4 @@
-flask>=3.0
-mlflow>=2.12
-pandas>=2.0
-scikit-learn>=1.4
+flask
+mlflow
+pandas
+scikit-learn

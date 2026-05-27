@@ -1,0 +1,8 @@
+evidently
+pandas
+sqlalchemy
+sqlalchemy-utils
+psycopg2-binary
+prefect
+python-dotenv
+scikit-learn

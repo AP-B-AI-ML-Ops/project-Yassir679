@@ -1,6 +1,11 @@
-FROM python:3.12-slim
+FROM python:3.12-bullseye
 
-WORKDIR /app
+RUN pip install -U pip
 
-# Placeholder – monitoring service not yet implemented
-CMD ["python", "-c", "import time; print('Monitoring placeholder running'); time.sleep(86400 * 365)"]
+COPY . /
+
+RUN pip install -r ./requirements.txt --upgrade
+
+RUN prefect config set PREFECT_API_URL=http://orchestration:4200/api
+
+CMD ["python", "monitor.py"]

@@ -1,12 +1,13 @@
-FROM python:3.12-slim
+FROM python:3.12-bullseye
 
-WORKDIR /app
+RUN pip install -U pip
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY . /
 
-COPY flow.py .
-COPY start_pool_worker.sh .
-RUN chmod +x start_pool_worker.sh
+RUN pip install -r ./requirements.txt --upgrade
+
+RUN prefect config set PREFECT_API_URL=http://orchestration:4200/api
+
+RUN chmod +x ./start_pool_worker.sh
 
 CMD ["./start_pool_worker.sh"]

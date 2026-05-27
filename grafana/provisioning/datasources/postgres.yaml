@@ -1,0 +1,17 @@
+apiVersion: 1
+
+datasources:
+  - name: Energy PostgreSQL
+    type: postgres
+    uid: energy-postgres
+    url: database:5432
+    user: mlflow
+    secureJsonData:
+      password: "password"
+    jsonData:
+      database: metrics
+      sslmode: disable
+      postgresVersion: 1600
+      timescaledb: false
+    isDefault: true
+    editable: true
