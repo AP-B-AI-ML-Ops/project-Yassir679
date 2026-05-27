@@ -35,7 +35,12 @@ def load_joined_data() -> pd.DataFrame:
     df["datum"] = df["tijd"].dt.tz_convert(None).dt.normalize()
     agg = (
         df.groupby("datum")[
-            ["vlaanderen zon kwh", "vlaanderen wind kwh", "elia zon kwh", "elia wind kwh"]
+            [
+                "vlaanderen zon kwh",
+                "vlaanderen wind kwh",
+                "elia zon kwh",
+                "elia wind kwh",
+            ]
         ]
         .sum()
         .reset_index()
@@ -53,17 +58,23 @@ def load_joined_data() -> pd.DataFrame:
 def run_report(df_ref: pd.DataFrame, df_cur: pd.DataFrame):
     definition = DataDefinition(
         numerical_columns=[
-            "zon_mwh_predicted", "zon_mwh_actual",
-            "wind_mwh_predicted", "wind_mwh_actual",
+            "zon_mwh_predicted",
+            "zon_mwh_actual",
+            "wind_mwh_predicted",
+            "wind_mwh_actual",
         ],
-        regression=[Regression(target="zon_mwh_actual", prediction="zon_mwh_predicted")],
+        regression=[
+            Regression(target="zon_mwh_actual", prediction="zon_mwh_predicted")
+        ],
     )
-    report = Report([
-        ValueDrift(column="zon_mwh_predicted"),
-        ValueDrift(column="wind_mwh_predicted"),
-        DriftedColumnsCount(),
-        DataSummaryPreset(),
-    ])
+    report = Report(
+        [
+            ValueDrift(column="zon_mwh_predicted"),
+            ValueDrift(column="wind_mwh_predicted"),
+            DriftedColumnsCount(),
+            DataSummaryPreset(),
+        ]
+    )
     return report.run(
         Dataset.from_pandas(df_cur, data_definition=definition),
         Dataset.from_pandas(df_ref, data_definition=definition),
@@ -71,7 +82,9 @@ def run_report(df_ref: pd.DataFrame, df_cur: pd.DataFrame):
 
 
 @task
-def store_metrics(run, df_cur: pd.DataFrame, run_time: datetime.datetime) -> pd.DataFrame:
+def store_metrics(
+    run, df_cur: pd.DataFrame, run_time: datetime.datetime
+) -> pd.DataFrame:
     json_data = run.dict()
     rows = [
         {
@@ -87,7 +100,8 @@ def store_metrics(run, df_cur: pd.DataFrame, run_time: datetime.datetime) -> pd.
         mean_squared_error(df_cur["zon_mwh_actual"], df_cur["zon_mwh_predicted"]) ** 0.5
     )
     wind_rmse = float(
-        mean_squared_error(df_cur["wind_mwh_actual"], df_cur["wind_mwh_predicted"]) ** 0.5
+        mean_squared_error(df_cur["wind_mwh_actual"], df_cur["wind_mwh_predicted"])
+        ** 0.5
     )
     rows += [
         {"run_time": run_time, "metric_name": "zon_rmse", "value": str(zon_rmse)},
@@ -110,7 +124,9 @@ def monitoring_flow():
     joined = load_joined_data()
 
     if len(joined) < 4:
-        print(f"Not enough data ({len(joined)} rows) – need at least 4 for ref/current split.")
+        print(
+            f"Not enough data ({len(joined)} rows) – need at least 4 for ref/current split."
+        )
         return
 
     mid = len(joined) // 2

@@ -41,7 +41,7 @@ services:
         condition: service_healthy
     volumes:
       - batch-data:/batch-data
-      
+
   train-deploy:
     build: ./train-and-deploy
     depends_on:

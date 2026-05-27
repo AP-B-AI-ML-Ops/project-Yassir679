@@ -24,7 +24,6 @@ from itertools import product as cartesian_product
 
 import mlflow
 import mlflow.sklearn
-import numpy as np
 import pandas as pd
 from mlflow.models.signature import infer_signature
 from prefect import flow, get_run_logger, task
@@ -42,7 +41,9 @@ warnings.filterwarnings("ignore")
 # Configuration (all overridable via environment variables)
 # ---------------------------------------------------------------------------
 DATA_DIR = os.getenv("DATA_DIR", "/data")
-MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://experiment-tracking:5000")
+MLFLOW_TRACKING_URI = os.getenv(
+    "MLFLOW_TRACKING_URI", "http://experiment-tracking:5000"
+)
 EXPERIMENT_NAME = os.getenv("EXPERIMENT_NAME", "energy-production-forecasting")
 
 WIND_CSV = os.path.join(DATA_DIR, "Wind_final.csv")
@@ -83,6 +84,7 @@ MODELS: dict[str, dict] = {
 # Tasks — data loading
 # ---------------------------------------------------------------------------
 
+
 @task(name="load-wind-data", retries=2, retry_delay_seconds=5, cache_policy=NO_CACHE)
 def load_wind_data(path: str) -> pd.DataFrame:
     logger = get_run_logger()
@@ -108,7 +110,9 @@ def load_sun_data(path: str) -> pd.DataFrame:
     return result
 
 
-@task(name="load-productie-data", retries=2, retry_delay_seconds=5, cache_policy=NO_CACHE)
+@task(
+    name="load-productie-data", retries=2, retry_delay_seconds=5, cache_policy=NO_CACHE
+)
 def load_productie_data(path: str) -> pd.DataFrame:
     logger = get_run_logger()
     df = pd.read_csv(path, na_values=["NULL", "null", ""])
@@ -116,8 +120,12 @@ def load_productie_data(path: str) -> pd.DataFrame:
     df["datum"] = df["tijd"].dt.tz_convert(None).dt.normalize()
     agg = (
         df.groupby("datum")[
-            ["vlaanderen zon kwh", "vlaanderen wind kwh",
-             "elia zon kwh", "elia wind kwh"]
+            [
+                "vlaanderen zon kwh",
+                "vlaanderen wind kwh",
+                "elia zon kwh",
+                "elia wind kwh",
+            ]
         ]
         .sum()
         .reset_index()
@@ -132,6 +140,7 @@ def load_productie_data(path: str) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 # Task — join
 # ---------------------------------------------------------------------------
+
 
 @task(name="join-datasets", cache_policy=NO_CACHE)
 def join_datasets(
@@ -160,6 +169,7 @@ def join_datasets(
 # Task — feature preparation
 # ---------------------------------------------------------------------------
 
+
 @task(name="prepare-features", cache_policy=NO_CACHE)
 def prepare_features(
     df: pd.DataFrame,
@@ -180,7 +190,10 @@ def prepare_features(
     )
     logger.info(
         "Features for '%s': train=%d  test=%d  features=%d",
-        target_col, len(X_train), len(X_test), X.shape[1],
+        target_col,
+        len(X_train),
+        len(X_test),
+        X.shape[1],
     )
     return X_train, X_test, y_train, y_test
 
@@ -188,6 +201,7 @@ def prepare_features(
 # ---------------------------------------------------------------------------
 # Task — train one model variant and log to MLflow
 # ---------------------------------------------------------------------------
+
 
 @task(name="train-and-log", cache_policy=NO_CACHE)
 def train_and_log(
@@ -213,7 +227,9 @@ def train_and_log(
 
     cv_rmse = float(
         -cross_val_score(
-            pipe, X_train, y_train,
+            pipe,
+            X_train,
+            y_train,
             scoring="neg_root_mean_squared_error",
             cv=CV_FOLDS,
         ).mean()
@@ -253,7 +269,11 @@ def train_and_log(
 
     logger.info(
         "[%s] %s  cv_rmse=%.3f  test_rmse=%.3f  r2=%.3f",
-        target_col, model_name, cv_rmse, rmse, r2,
+        target_col,
+        model_name,
+        cv_rmse,
+        rmse,
+        r2,
     )
     return run_id, rmse
 
@@ -261,6 +281,7 @@ def train_and_log(
 # ---------------------------------------------------------------------------
 # Task — register best model
 # ---------------------------------------------------------------------------
+
 
 @task(name="register-best-model", cache_policy=NO_CACHE)
 def register_best_model(
@@ -284,13 +305,17 @@ def register_best_model(
     )
     logger.info(
         "Registered '%s' version %s (run=%s…, rmse=%.3f)",
-        registry_name, mv.version, best_run_id[:8], best_rmse,
+        registry_name,
+        mv.version,
+        best_run_id[:8],
+        best_rmse,
     )
 
 
 # ---------------------------------------------------------------------------
 # Flow
 # ---------------------------------------------------------------------------
+
 
 @flow(
     name="training-pipeline",
@@ -312,15 +337,21 @@ def training_pipeline(
     experiment = mlflow.get_experiment_by_name(experiment_name)
     if experiment is None:
         experiment_id = mlflow.create_experiment(experiment_name)
-        logger.info("Created MLflow experiment '%s' (id=%s)", experiment_name, experiment_id)
+        logger.info(
+            "Created MLflow experiment '%s' (id=%s)", experiment_name, experiment_id
+        )
     else:
         experiment_id = experiment.experiment_id
-        logger.info("Using MLflow experiment '%s' (id=%s)", experiment_name, experiment_id)
+        logger.info(
+            "Using MLflow experiment '%s' (id=%s)", experiment_name, experiment_id
+        )
 
     # ── Data loading (can run concurrently) ──────────────────────────────────
     wind_future = load_wind_data.submit(os.path.join(data_dir, "Wind_final.csv"))
     sun_future = load_sun_data.submit(os.path.join(data_dir, "sun_combined.csv"))
-    prod_future = load_productie_data.submit(os.path.join(data_dir, "productie_comnbined.csv"))
+    prod_future = load_productie_data.submit(
+        os.path.join(data_dir, "productie_comnbined.csv")
+    )
 
     df = join_datasets(prod_future.result(), wind_future.result(), sun_future.result())
 
@@ -364,6 +395,7 @@ def training_pipeline(
 # ---------------------------------------------------------------------------
 # Entrypoint
 # ---------------------------------------------------------------------------
+
 
 def _wait_for_prefect(api_url: str, retries: int = 12, delay: int = 10) -> None:
     """Block until the Prefect API responds or raise after `retries` attempts."""

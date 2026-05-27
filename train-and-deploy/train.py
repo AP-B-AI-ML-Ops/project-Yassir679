@@ -16,7 +16,6 @@ Pipeline:
 import os
 import warnings
 import pandas as pd
-import numpy as np
 
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.linear_model import Ridge
@@ -35,7 +34,9 @@ warnings.filterwarnings("ignore")
 # Configuration
 # ---------------------------------------------------------------------------
 DATA_DIR = os.getenv("DATA_DIR", "/data")
-MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://experiment-tracking:5000")
+MLFLOW_TRACKING_URI = os.getenv(
+    "MLFLOW_TRACKING_URI", "http://experiment-tracking:5000"
+)
 EXPERIMENT_NAME = os.getenv("EXPERIMENT_NAME", "energy-production-forecasting")
 
 WIND_CSV = os.path.join(DATA_DIR, "Wind_final.csv")
@@ -53,6 +54,7 @@ CV_FOLDS = 5
 # ---------------------------------------------------------------------------
 # 1. Load & join
 # ---------------------------------------------------------------------------
+
 
 def load_wind(path: str) -> pd.DataFrame:
     """Load daily wind speed data and return a normalised DataFrame."""
@@ -87,8 +89,12 @@ def load_productie(path: str) -> pd.DataFrame:
     # Sum hourly kWh → daily kWh → convert to MWh
     agg = (
         df.groupby("datum")[
-            ["vlaanderen zon kwh", "vlaanderen wind kwh",
-             "elia zon kwh", "elia wind kwh"]
+            [
+                "vlaanderen zon kwh",
+                "vlaanderen wind kwh",
+                "elia zon kwh",
+                "elia wind kwh",
+            ]
         ]
         .sum()
         .reset_index()
@@ -112,8 +118,10 @@ def build_dataset() -> pd.DataFrame:
     df = df.dropna()
     df = df.sort_values("datum").reset_index(drop=True)
 
-    print(f"[data] Joined dataset: {len(df)} rows, date range "
-          f"{df['datum'].min().date()} – {df['datum'].max().date()}")
+    print(
+        f"[data] Joined dataset: {len(df)} rows, date range "
+        f"{df['datum'].min().date()} – {df['datum'].max().date()}"
+    )
     return df
 
 
@@ -171,6 +179,7 @@ MODELS = {
 # 4. Training & MLflow tracking
 # ---------------------------------------------------------------------------
 
+
 def evaluate(model, X_test, y_test):
     y_pred = model.predict(X_test)
     return {
@@ -210,13 +219,18 @@ def train_target(target_col: str, df: pd.DataFrame, experiment_id: str):
             # Build sklearn pipeline: scaler + model with these hyperparameters.
             estimator = config["model"].__class__(
                 **{k.replace("model__", ""): v for k, v in hp.items()},
-                **({"random_state": RANDOM_STATE}
-                   if hasattr(config["model"], "random_state") else {}),
+                **(
+                    {"random_state": RANDOM_STATE}
+                    if hasattr(config["model"], "random_state")
+                    else {}
+                ),
             )
             pipe = Pipeline([("scaler", StandardScaler()), ("model", estimator)])
 
             cv_rmse = -cross_val_score(
-                pipe, X_train, y_train,
+                pipe,
+                X_train,
+                y_train,
                 scoring="neg_root_mean_squared_error",
                 cv=CV_FOLDS,
             ).mean()
@@ -224,12 +238,13 @@ def train_target(target_col: str, df: pd.DataFrame, experiment_id: str):
             pipe.fit(X_train, y_train)
             test_metrics = evaluate(pipe, X_test, y_test)
 
-            run_name = (
-                f"{target_col}__{model_name}__"
-                + "__".join(f"{k.replace('model__', '')}={v}" for k, v in hp.items())
+            run_name = f"{target_col}__{model_name}__" + "__".join(
+                f"{k.replace('model__', '')}={v}" for k, v in hp.items()
             )
 
-            with mlflow.start_run(experiment_id=experiment_id, run_name=run_name) as run:
+            with mlflow.start_run(
+                experiment_id=experiment_id, run_name=run_name
+            ) as run:
                 # Log parameters
                 mlflow.log_param("target", target_col)
                 mlflow.log_param("model", model_name)
@@ -247,9 +262,12 @@ def train_target(target_col: str, df: pd.DataFrame, experiment_id: str):
 
                 # Log model artifact with input/output signature
                 signature = infer_signature(X_train, pipe.predict(X_train))
-                mlflow.sklearn.log_model(pipe, artifact_path="model",
-                                         signature=signature,
-                                         input_example=X_train.head(3))
+                mlflow.sklearn.log_model(
+                    pipe,
+                    artifact_path="model",
+                    signature=signature,
+                    input_example=X_train.head(3),
+                )
 
                 print(
                     f"  [{target_col}] {model_name:20s} "
@@ -286,6 +304,7 @@ def train_target(target_col: str, df: pd.DataFrame, experiment_id: str):
 # ---------------------------------------------------------------------------
 # 5. Entrypoint
 # ---------------------------------------------------------------------------
+
 
 def main():
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)

@@ -14,7 +14,9 @@ from prefect.cache_policies import NO_CACHE
 from prefect.deployments import run_deployment
 from sklearn.metrics import mean_squared_error
 
-MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://experiment-tracking:5000")
+MLFLOW_TRACKING_URI = os.getenv(
+    "MLFLOW_TRACKING_URI", "http://experiment-tracking:5000"
+)
 ZON_MODEL_NAME = os.getenv("ZON_MODEL_NAME", "energy-zon-production")
 WIND_MODEL_NAME = os.getenv("WIND_MODEL_NAME", "energy-wind-production")
 
@@ -29,11 +31,14 @@ RMSE_THRESHOLD_ZON = float(os.getenv("RMSE_THRESHOLD_ZON", "500"))
 RMSE_THRESHOLD_WIND = float(os.getenv("RMSE_THRESHOLD_WIND", "300"))
 
 # Name of the Prefect deployment to trigger for retraining
-RETRAIN_DEPLOYMENT = os.getenv("RETRAIN_DEPLOYMENT", "training-pipeline/energy-training")
+RETRAIN_DEPLOYMENT = os.getenv(
+    "RETRAIN_DEPLOYMENT", "training-pipeline/energy-training"
+)
 
 # ---------------------------------------------------------------------------
 # MLflow helpers
 # ---------------------------------------------------------------------------
+
 
 def get_latest_version(model_name: str) -> str:
     """Return the latest registered version number for a model via the MLflow REST API."""
@@ -71,7 +76,13 @@ FEATURE_COLS = [
 # Task 1 – Fetch weather forecast from Open-Meteo (ECMWF)
 # ---------------------------------------------------------------------------
 
-@task(name="fetch-weather-forecast", retries=3, retry_delay_seconds=15, cache_policy=NO_CACHE)
+
+@task(
+    name="fetch-weather-forecast",
+    retries=3,
+    retry_delay_seconds=15,
+    cache_policy=NO_CACHE,
+)
 def fetch_weather_forecast() -> pd.DataFrame:
     """Call the Open-Meteo ECMWF API and return daily aggregated weather features."""
     logger = get_run_logger()
@@ -94,11 +105,13 @@ def fetch_weather_forecast() -> pd.DataFrame:
     resp.raise_for_status()
     data = resp.json()
 
-    hourly = pd.DataFrame({
-        "time": pd.to_datetime(data["hourly"]["time"]),
-        "shortwave_radiation": data["hourly"]["shortwave_radiation"],
-        "wind_speed_10m": data["hourly"]["wind_speed_10m"],
-    })
+    hourly = pd.DataFrame(
+        {
+            "time": pd.to_datetime(data["hourly"]["time"]),
+            "shortwave_radiation": data["hourly"]["shortwave_radiation"],
+            "wind_speed_10m": data["hourly"]["wind_speed_10m"],
+        }
+    )
 
     hourly["datum"] = hourly["time"].dt.normalize()
     daily = (
@@ -122,6 +135,7 @@ def fetch_weather_forecast() -> pd.DataFrame:
 # Task 2 – Run inference with the registered MLflow models
 # ---------------------------------------------------------------------------
 
+
 @task(name="run-inference", cache_policy=NO_CACHE)
 def run_inference(forecast_df: pd.DataFrame) -> pd.DataFrame:
     """Load the latest registered MLflow models and predict solar & wind production."""
@@ -144,6 +158,7 @@ def run_inference(forecast_df: pd.DataFrame) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 # Task 3 – Persist predictions
 # ---------------------------------------------------------------------------
+
 
 @task(name="save-predictions", cache_policy=NO_CACHE)
 def save_predictions(predictions: pd.DataFrame) -> None:
@@ -169,6 +184,7 @@ def save_predictions(predictions: pd.DataFrame) -> None:
 # Task 4 – Load Elia / Vlaanderen actuals
 # ---------------------------------------------------------------------------
 
+
 @task(name="load-actuals", retries=2, retry_delay_seconds=5, cache_policy=NO_CACHE)
 def load_actuals() -> pd.DataFrame:
     """Aggregate hourly production CSV to daily MWh totals."""
@@ -180,8 +196,12 @@ def load_actuals() -> pd.DataFrame:
 
     agg = (
         df.groupby("datum")[
-            ["vlaanderen zon kwh", "vlaanderen wind kwh",
-             "elia zon kwh", "elia wind kwh"]
+            [
+                "vlaanderen zon kwh",
+                "vlaanderen wind kwh",
+                "elia zon kwh",
+                "elia wind kwh",
+            ]
         ]
         .sum()
         .reset_index()
@@ -197,6 +217,7 @@ def load_actuals() -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 # Task 5 – Compute RMSE metrics
 # ---------------------------------------------------------------------------
+
 
 @task(name="compute-metrics", cache_policy=NO_CACHE)
 def compute_metrics(actuals: pd.DataFrame) -> dict | None:
@@ -217,7 +238,8 @@ def compute_metrics(actuals: pd.DataFrame) -> dict | None:
     if len(joined) < 2:
         logger.warning(
             "Only %d overlapping dates between predictions and actuals "
-            "– need at least 2 for RMSE.", len(joined),
+            "– need at least 2 for RMSE.",
+            len(joined),
         )
         return None
 
@@ -225,7 +247,8 @@ def compute_metrics(actuals: pd.DataFrame) -> dict | None:
         mean_squared_error(joined["zon_mwh_actual"], joined["zon_mwh_predicted"]) ** 0.5
     )
     wind_rmse = float(
-        mean_squared_error(joined["wind_mwh_actual"], joined["wind_mwh_predicted"]) ** 0.5
+        mean_squared_error(joined["wind_mwh_actual"], joined["wind_mwh_predicted"])
+        ** 0.5
     )
 
     metrics = {
@@ -236,7 +259,9 @@ def compute_metrics(actuals: pd.DataFrame) -> dict | None:
     }
     logger.info(
         "Metrics: zon_rmse=%.3f  wind_rmse=%.3f  (n=%d days)",
-        zon_rmse, wind_rmse, len(joined),
+        zon_rmse,
+        wind_rmse,
+        len(joined),
     )
     return metrics
 
@@ -244,6 +269,7 @@ def compute_metrics(actuals: pd.DataFrame) -> dict | None:
 # ---------------------------------------------------------------------------
 # Task 6 – Save metrics
 # ---------------------------------------------------------------------------
+
 
 @task(name="save-metrics", cache_policy=NO_CACHE)
 def save_metrics(metrics: dict) -> None:
@@ -263,6 +289,7 @@ def save_metrics(metrics: dict) -> None:
 # Task 7 – Check retraining threshold
 # ---------------------------------------------------------------------------
 
+
 @task(name="check-retraining-threshold", cache_policy=NO_CACHE)
 def check_retraining_threshold(metrics: dict) -> None:
     """Trigger the training-pipeline deployment when RMSE exceeds a threshold."""
@@ -273,14 +300,16 @@ def check_retraining_threshold(metrics: dict) -> None:
     if metrics["zon_rmse"] > RMSE_THRESHOLD_ZON:
         logger.warning(
             "Solar RMSE %.3f > threshold %.3f – retraining needed.",
-            metrics["zon_rmse"], RMSE_THRESHOLD_ZON,
+            metrics["zon_rmse"],
+            RMSE_THRESHOLD_ZON,
         )
         needs_retrain = True
 
     if metrics["wind_rmse"] > RMSE_THRESHOLD_WIND:
         logger.warning(
             "Wind RMSE %.3f > threshold %.3f – retraining needed.",
-            metrics["wind_rmse"], RMSE_THRESHOLD_WIND,
+            metrics["wind_rmse"],
+            RMSE_THRESHOLD_WIND,
         )
         needs_retrain = True
 
@@ -294,14 +323,17 @@ def check_retraining_threshold(metrics: dict) -> None:
         logger.info(
             "RMSE within thresholds – no retraining needed "
             "(zon=%.3f/%.3f, wind=%.3f/%.3f).",
-            metrics["zon_rmse"], RMSE_THRESHOLD_ZON,
-            metrics["wind_rmse"], RMSE_THRESHOLD_WIND,
+            metrics["zon_rmse"],
+            RMSE_THRESHOLD_ZON,
+            metrics["wind_rmse"],
+            RMSE_THRESHOLD_WIND,
         )
 
 
 # ---------------------------------------------------------------------------
 # Flow
 # ---------------------------------------------------------------------------
+
 
 @flow(
     name="batch-inference-pipeline",
@@ -337,5 +369,5 @@ def batch_inference_pipeline() -> None:
 if __name__ == "__main__":
     batch_inference_pipeline.serve(
         name="energy-batch",
-        cron="0 6 * * *",   # every day at 06:00 UTC
+        cron="0 6 * * *",  # every day at 06:00 UTC
     )

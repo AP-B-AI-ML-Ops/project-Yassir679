@@ -3,4 +3,3 @@ CREATE DATABASE prefect;
 
 -- Create a separate database for Evidently monitoring metrics
 CREATE DATABASE metrics;
-

@@ -10,7 +10,9 @@ from flask import Flask, jsonify, request
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://experiment-tracking:5000")
+MLFLOW_TRACKING_URI = os.getenv(
+    "MLFLOW_TRACKING_URI", "http://experiment-tracking:5000"
+)
 ZON_MODEL_NAME = os.getenv("ZON_MODEL_NAME", "energy-zon-production")
 WIND_MODEL_NAME = os.getenv("WIND_MODEL_NAME", "energy-wind-production")
 
@@ -67,13 +69,15 @@ def predict():
     for f in forecasts:
         try:
             d = pd.Timestamp(f["date"])
-            rows.append({
-                "wind_speed_kmh": float(f["wind_speed_kmh"]),
-                "solar_radiation_wm2": float(f["solar_radiation_wm2"]),
-                "day_of_year": d.day_of_year,
-                "month": d.month,
-                "weekday": d.weekday(),
-            })
+            rows.append(
+                {
+                    "wind_speed_kmh": float(f["wind_speed_kmh"]),
+                    "solar_radiation_wm2": float(f["solar_radiation_wm2"]),
+                    "day_of_year": d.day_of_year,
+                    "month": d.month,
+                    "weekday": d.weekday(),
+                }
+            )
         except (KeyError, ValueError) as exc:
             return jsonify({"error": f"Invalid forecast entry: {exc}"}), 400
 
